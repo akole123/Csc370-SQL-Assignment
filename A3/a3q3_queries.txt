@@ -1,0 +1,46 @@
+-- CSC 370 - Spring 2018
+-- Assignment 3: Queries for Question 3 (vwsn_1year)
+-- Name: Jordan Zhen or Dongbai Zhen
+-- Student ID:V00803515
+
+-- Place your query for each sub-question in the appropriate position
+-- below. Do not modify or remove the '-- Question 3x --' header before
+-- each question.
+
+-- Question 3a --
+
+with max_temp as (select max(temperature)as temperature from observations),
+holding as (select station_id as id,observation_time,temperature from observations natural join max_temp)
+select id,name,temperature,observation_time from holding natural join stations;
+
+-- Question 3b --
+
+with calculate_max as (select station_id,max(temperature) as temperature from observations where station_id <= 10 group by station_id),
+id_storing as (select station_id as id,temperature,observation_time from calculate_max natural join observations)
+select id as station_id,name,temperature as max_temperature,observation_time from stations natural join id_storing order by id;
+
+-- Question 3c --
+
+with station_things as (select id,name from stations),
+observed_at_june_2017 as (select station_id as id,observation_time from observations where
+extract(month from observation_time) = 6 and extract(year from observation_time) = 2017),
+no_observation_at_2017 as (select id from station_things
+except 
+select id from observed_at_june_2017)
+select id as station_id,name from no_observation_at_2017 natural join stations order by id;
+
+-- Question 3d --
+
+with distinct_month as (select distinct extract(month from observation_time) as month,extract(year from observation_time) as year from observations),
+rankings as(select extract(month from observation_time) as month,extract(day from observation_time) as day,temperature
+from observations),
+average_temp as (select month,day,avg(temperature) as average from rankings group by month,day),
+top_10_hot_days as (select month,rank() over(partition by month order by average desc) as rank,average from average_temp order by month),
+top_10_cold_days as (select month,rank() over(partition by month order by average) as rank,average from average_temp order by month),
+hottest_days as (select * from top_10_hot_days where rank <= 10),
+coldest_days as (select * from top_10_cold_days where rank <= 10),
+average_hot as (select month,avg(average) as hottest10_average from hottest_days group by month),
+average_cold as (select month,avg(average) as coolest10_average from coldest_days group by month)
+select year,month,hottest10_average,coolest10_average from average_hot natural join average_cold natural join distinct_month order by year,month;
+
+

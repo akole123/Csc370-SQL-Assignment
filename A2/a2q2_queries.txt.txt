@@ -1,0 +1,26 @@
+-- CSC 370 - Spring 2018
+-- Assignment 2: Queries for Question 2 (ferries)
+-- Name:Dongbai Zhen
+-- Student ID: V00803515
+
+-- Place your query for each sub-question in the appropriate position
+-- below. Do not modify or remove the '-- Question 2x --' header before
+-- each question.
+
+
+-- Question 2a --
+select distinct vessel_name from fleet natural join sailings
+where route_number = 1 order by vessel_name;
+
+-- Question 2b --
+select distinct vessel_name,count(sailings.arrival) as count from fleet natural join sailings 
+natural join routes group by vessel_name order by vessel_name;
+
+-- Question 2c --
+ select distinct vessel_name ,count(distinct routes) as num_routes from fleet natural join sailings
+natural join routes group by vessel_name having count(distinct sailings.route_number) >= 2 order by vessel_name;
+
+-- Question 2d --
+with minYear as (select route_number, min(year_built) as year_built from sailings natural join fleet natural join 
+routes group by route_number)select distinct route_number,vessel_name,year_built from sailings natural join fleet natural
+ join routes natural join minYear order by route_number;

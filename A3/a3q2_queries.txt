@@ -1,0 +1,75 @@
+-- CSC 370 - Spring 2018
+-- Assignment 3 Queries for Question 2 (ferries)
+-- Name: Jordan Zhen or Dongbai Zhen
+-- Student ID: V00803515
+
+-- Place your query for each sub-question in the appropriate position
+-- below. Do not modify or remove the '-- Question 2x --' header before
+-- each question.
+
+
+
+
+-- Question 2a --
+
+with vessel_pair as(select F1.vessel_name as vessel1,F2.vessel_name as vessel2, F1.route_number as vessel1route,
+F2.route_number as vessel2route,F1.scheduled_departure as vessel1depart, F2.scheduled_departure as vessel2depart from sailings
+as F1 cross join sailings as F2 where F1.vessel_name <> F2.vessel_name and F1.route_number = F2.route_number and F1.scheduled_departure = F2.scheduled_departure),
+duplicated_list as(select distinct vessel1,vessel2,Count(vessel1route) as counter from vessel_pair group by vessel1,vessel2)
+
+select vessel1,vessel2,counter as num_pairings from duplicated_list where vessel1 < vessel2 order by counter DESC;
+
+-- Question 2b --
+with avg_nom as (select distinct route_number,round(avg(nominal_duration)) as nominal_duration from routes group by route_number),
+avg_duration as(select distinct route_number,avg((extract(epoch from arrival) - extract(epoch from scheduled_departure))/60) as avg_duration from sailings group by route_number)
+select route_number,nominal_duration,avg_duration from avg_nom natural join avg_duration order by route_number;
+
+
+with route_1 as (select vessel_name,route_number,arrival,scheduled_departure,
+(extract(epoch from arrival) - extract(epoch from scheduled_departure))/60 as duration_minutes,nominal_duration
+from sailings natural join routes where route_number = 1),
+late_sail as (select vessel_name,scheduled_departure from route_1 natural join routes where (duration_minutes - nominal_duration) >= 5),
+days_with_no_late as(
+select distinct make_date( extract(year from scheduled_departure)::int, 
+						   extract(month from scheduled_departure)::int, 
+						   extract(day from scheduled_departure)::int) as sailing_date
+from route_1
+except
+select distinct make_date( extract(year from scheduled_departure)::int, 
+						   extract(month from scheduled_departure)::int, 
+						   extract(day from scheduled_departure)::int) as late_sail_date
+from late_sail)
+select distinct extract(month from sailing_date) as month,count(*) as count from days_with_no_late group by month;
+
+-- Question 2d --
+with total_sail as (select vessel_name,count(*) as count from sailings natural join fleet group by vessel_name),
+route_1 as (select vessel_name,route_number,arrival,scheduled_departure,
+(extract(epoch from arrival) - extract(epoch from scheduled_departure))/60 as duration_minutes from sailings),
+late_sail as (select vessel_name from route_1 natural join routes where (duration_minutes - nominal_duration) >= 5),
+counting_late_sail as (select vessel_name,count(*) as late_counter from late_sail group by vessel_name),
+finished as(select total_sail.vessel_name as vessel_name,count,(case when late_counter IS NULL or late_counter = 0 then 0 else late_counter end) as later_counter
+from total_sail left outer join counting_late_sail on total_sail.vessel_name = counting_late_sail.vessel_name)
+select vessel_name,count as total_sailings,later_counter as late_sailings,((later_counter+0.0)/count) as late_fraction from finished;
+
+
+-- Question 2g --
+
+with late_time as (select vessel_name,route_number,arrival,scheduled_departure,
+(extract(epoch from actual_departure) - extract(epoch from scheduled_departure))/60 as duration_minutes from sailings),
+
+late_sail as (select vessel_name,route_number,arrival,scheduled_departure from late_time natural join routes where duration_minutes >= 15),
+
+arrive_fine as (select vessel_name,route_number,arrival,scheduled_departure,
+(extract(epoch from arrival) - extract(epoch from scheduled_departure))/60 as arrive_early from sailings),
+
+early_arrival as (select vessel_name,route_number,arrival,scheduled_departure from arrive_fine natural join routes where (arrive_early-nominal_duration) <= 5),
+
+has_both as (select * from early_arrival
+intersect
+select * from late_sail)
+
+select distinct vessel_name,count(*) as made_up_sailings from has_both group by vessel_name order by vessel_name;
+
+
+
+
